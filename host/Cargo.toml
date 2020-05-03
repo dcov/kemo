@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "kemo-host"
 version = "0.1.0"
 authors = ["Diego Covarrubias <dcov@pm.me>"]
 edition = "2018"
