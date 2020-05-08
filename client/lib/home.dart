@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 
 import 'client.dart';
@@ -18,46 +19,106 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
 
-  Future<void> _onAddHost() async {
+  Box get _box => widget.box;
 
+  void _onAddHost() async {
+    final MapEntry<String, int> host = await _showAddHostDialog(context);
+    if (host != null) {
+      setState(() {
+        widget.box.put(host.key, host.value);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(48.0),
-        child: NavigationToolbar(
-          middle: Text('Kemo'),
-          trailing: IconButton(
-            icon: Icon(Icons.add),
-            onPressed: _onAddHost))));
+    final List addresses = _box.keys.toList();
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+          child: SizedBox(
+            height: 48.0,
+            child: NavigationToolbar(
+              middle: Text('Kemo'),
+              trailing: IconButton(
+                icon: Icon(Icons.add),
+                onPressed: _onAddHost)))),
+        Expanded(
+          child: ListView.builder(
+            itemCount: addresses.length,
+            itemBuilder: (BuildContext context, int index) {
+              final String address = addresses[index];
+              final int port = _box.get(address);
+              return ListTile(
+                title: Text('$address:$port'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => Client(address: address, port: port)));
+                });
+            }))
+      ]);
   }
 }
 
-Future<String> _showAddHostDialog(BuildContext context) {
-  showDialog(
+Future<MapEntry<String, int>> _showAddHostDialog(BuildContext context) {
+
+  String ipAddress;
+  String portNumber;
+
+  final ValueNotifier<bool> valuesAreValid = ValueNotifier(false);
+  void validateValues() {
+    valuesAreValid.value = ipAddress.isNotEmpty && int.tryParse(portNumber) != null;
+  }
+  
+  return showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (BuildContext builderContext) {
+    builder: (_) {
+      return Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: <Widget>[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Add Host',
+                  style: TextStyle()))),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: 'Enter host IP address'),
+                onChanged: (String newIpAddress) {
+                  ipAddress = newIpAddress;
+                  validateValues();
+                })),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: 'Enter host port number'),
+                onChanged: (String newPortNumber) {
+                  portNumber = newPortNumber;
+                  validateValues();
+                })),
+            ValueListenableBuilder(
+              valueListenable: valuesAreValid,
+              builder: (BuildContext context, bool valuesAreValid, _) {
+                return FlatButton(
+                  child: Text('Confirm'),
+                  onPressed: valuesAreValid
+                    ? () => Navigator.pop(context, MapEntry(ipAddress, int.parse(portNumber)))
+                    : null);
+              })
+          ]));
     });
-}
-
-class _AddHostDialog extends StatefulWidget {
-
-  _AddHostDialog({ Key key }) : super(key: key);
-
-  @override
-  _AddHostDialogState createState() => _AddHostDialogState();
-}
-
-class _AddHostDialogState extends State<_AddHostDialog> {
-
-  @override
-  Widget build(BuildContext context) {
-    showDatePicker();
-    return Dialog(
-      child: SizedBox());
-  }
 }
 
