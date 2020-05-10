@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'messages.dart';
 
 class Client extends StatefulWidget {
 
@@ -19,7 +22,7 @@ class Client extends StatefulWidget {
   _ClientState createState() => _ClientState();
 }
 
-class _ClientState extends State<Client> {
+class _ClientState extends State<Client> implements TextInputClient {
 
   Future<Socket> _socketFuture;
   Socket _socket;
@@ -33,18 +36,6 @@ class _ClientState extends State<Client> {
       }
       return socket;
     }();
-  }
-
-  void _handleMouseMove(DragUpdateDetails details) {
-    print('MouseMove ${details.delta.dx}, ${details.delta.dy}');
-  }
-
-  void _handleMouseLeftClick() {
-    print('MouseLeftClick');
-  }
-
-  void _handleMouseRightClick() {
-    print('MouseRightClick');
   }
 
   @override
@@ -70,6 +61,25 @@ class _ClientState extends State<Client> {
     super.dispose();
   }
 
+  /// Requests that this client update its editing state to the given value.
+  void updateEditingValue(TextEditingValue value) {
+  }
+
+  /// Requests that this client perform the given action.
+  void performAction(TextInputAction action) {
+    if (action == TextInputAction.newline) {
+    }
+  }
+
+  @override
+  void updateFloatingCursor(RawFloatingCursorPoint point) { }
+
+  @override
+  TextEditingValue get currentTextEditingValue => TextEditingValue.empty;
+
+  @override
+  void connectionClosed() { }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -89,13 +99,13 @@ class _ClientState extends State<Client> {
                     child: CircularProgressIndicator()))
               else
                 ...[
-                  _MouseControls(
-                    onMove: _handleMouseMove,
-                    onLeftClick: _handleMouseLeftClick,
-                    onRightClick: _handleMouseRightClick),
+                  Expanded(
+                    child: _MouseControls(
+                    onMove: (details) => _socket.sendMouseMove(details.delta),
+                    onLeftClick: _socket.sendMouseLeftClick,
+                    onRightClick: _socket.sendMouseRightClick)),
                 ],
             ]),
-
         ]));
   }
 }
@@ -125,7 +135,8 @@ class _MouseControls extends StatelessWidget {
         onTap: onTap,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.grey))));
+            color: Colors.grey),
+          child: SizedBox.expand())));
   }
 
   @override

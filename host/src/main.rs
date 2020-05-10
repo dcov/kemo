@@ -1,7 +1,7 @@
 use std::io::{Read};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
-use enigo::{Enigo, Key, KeyboardControllable};
+use enigo::*;
 
 fn handle_client(mut stream: TcpStream) {
     let mut enigo = Enigo::new();
@@ -25,10 +25,37 @@ fn handle_client(mut stream: TcpStream) {
                             continue
                         }
                     };
+
                     let c = s.chars().next().unwrap();
                     enigo.key_click(Key::Layout(c));
+
+                } else if size == 1 {
+                    if first & 0x1 == 0 {
+                        enigo.mouse_click(MouseButton::Left);
+                    } else {
+                        enigo.mouse_click(MouseButton::Right);
+                    }
                 } else {
-                    // TODO: Implement mouse event handling
+                    let second = buffer[1];
+
+                    // If the MSB of the second byte is 0, then it's a click
+                    // event, else it's a move event.
+                    if second & 0x80 == 0 {
+                    } else {
+                        let dx = if first & 0x40 == 0 {
+                            (first - 128) as i32
+                        } else {
+                            -((first - 192) as i32)
+                        };
+
+                        let dy = if second & 0x40 == 0 {
+                            (second - 128) as i32
+                        } else {
+                            -((second - 192) as i32)
+                        };
+
+                        enigo.mouse_move_relative(dx, dy);
+                    }
                 }
             },
             Err(_) => {
