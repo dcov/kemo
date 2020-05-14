@@ -22,10 +22,12 @@ class Client extends StatefulWidget {
   _ClientState createState() => _ClientState();
 }
 
-class _ClientState extends State<Client> implements TextInputClient {
+class _ClientState extends State<Client> {
 
   Future<Socket> _socketFuture;
   Socket _socket;
+
+  FocusNode _focusNode;
 
   void  _connectToHost() {
     _socketFuture = () async {
@@ -42,6 +44,7 @@ class _ClientState extends State<Client> implements TextInputClient {
   void initState() {
     super.initState();
     _connectToHost();
+    _focusNode = FocusNode();
   }
 
   @override
@@ -53,6 +56,7 @@ class _ClientState extends State<Client> implements TextInputClient {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     if (_socket == null) {
       _socketFuture.then((socket) => socket.close());
     } else {
@@ -61,24 +65,8 @@ class _ClientState extends State<Client> implements TextInputClient {
     super.dispose();
   }
 
-  /// Requests that this client update its editing state to the given value.
-  void updateEditingValue(TextEditingValue value) {
+  void _showKeyboard() {
   }
-
-  /// Requests that this client perform the given action.
-  void performAction(TextInputAction action) {
-    if (action == TextInputAction.newline) {
-    }
-  }
-
-  @override
-  void updateFloatingCursor(RawFloatingCursorPoint point) { }
-
-  @override
-  TextEditingValue get currentTextEditingValue => TextEditingValue.empty;
-
-  @override
-  void connectionClosed() { }
 
   @override
   Widget build(BuildContext context) {
@@ -100,19 +88,23 @@ class _ClientState extends State<Client> implements TextInputClient {
               else
                 ...[
                   Expanded(
-                    child: _MouseControls(
-                    onMove: (details) => _socket.sendMouseMove(details.delta),
-                    onLeftClick: _socket.sendMouseLeftClick,
-                    onRightClick: _socket.sendMouseRightClick)),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 48.0),
+                      child: _MouseControl(
+                        onMove: (details) => _socket.sendMouseMove(details.delta),
+                        onLeftClick: _socket.sendMouseLeftClick,
+                        onRightClick: _socket.sendMouseRightClick))),
                 ],
             ]),
+            if (_socket != null)
+              _KeyboardControl(),
         ]));
   }
 }
 
-class _MouseControls extends StatelessWidget {
+class _MouseControl extends StatelessWidget {
 
-  _MouseControls({
+  _MouseControl({
     Key key,
     @required this.onMove,
     @required this.onLeftClick,
@@ -155,6 +147,94 @@ class _MouseControls extends StatelessWidget {
                 _buildMouseButton(onLeftClick),
                 _buildMouseButton(onRightClick)
               ])))
+      ]);
+  }
+}
+
+class _KeyboardControl extends StatefulWidget {
+
+  @override
+  _KeyboardControlState createState() => _KeyboardControlState();
+}
+
+class _KeyboardControlState extends State<_KeyboardControl>
+    with SingleTickerProviderStateMixin
+    implements TextInputClient {
+
+  AnimationController _animationController;
+  TextEditingController _textEditingController;
+  FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 100),
+      value: 0.0,
+      vsync: this);
+    _textEditingController = TextEditingController();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _focusNode.dispose();
+    _textEditingController.dispose();
+    _animationController.dispose();
+  }
+
+  @override
+  TextEditingValue get currentTextEditingValue => TextEditingValue.empty;
+
+  @override
+  void performAction(TextInputAction action) {
+  }
+
+  @override
+  void updateEditingValue(TextEditingValue value) {
+  }
+
+  void updateFloatingCursor(RawFloatingCursorPoint _) { }
+
+  @override
+  void connectionClosed() {
+  }
+
+  void _showKeyboard() {
+    TextInput.attach(
+      this,
+      TextInputConfiguration());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: GestureDetector(
+            onTap: _showKeyboard,
+            child: SizedBox(
+              height: 48.0,
+              child: Center(
+                child: Icon(Icons.keyboard))))),
+        ValueListenableBuilder(
+          valueListenable: _animationController,
+          builder: (BuildContext context, double value, _) {
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha((150 * value).round())));
+          }),
+        Offstage(
+          offstage: true,
+          child: EditableText(
+            controller: _textEditingController,
+            focusNode: _focusNode,
+            cursorColor: Colors.transparent,
+            backgroundCursorColor: Colors.transparent,
+            style: TextStyle(),
+            onChanged: ))
       ]);
   }
 }

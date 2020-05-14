@@ -1,3 +1,4 @@
+import 'dart:convert' show utf8;
 import 'dart:io' show Socket;
 import 'dart:typed_data' show Uint8List;
 import 'dart:ui' show Offset;
@@ -50,6 +51,11 @@ extension SocketMessages on Socket {
     final Uint8List data = Uint8List(1);
     data[0] = 0x81;
     _send(data);
+  }
+
+  void sendKeyChar(String value) {
+    assert(value.length == 1);
+    _send(Uint8List.fromList(utf8.encode(value)));
   }
 }
 
