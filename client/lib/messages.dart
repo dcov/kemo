@@ -53,7 +53,7 @@ extension SocketMessages on Socket {
     _send(data);
   }
 
-  void sendKeyChar(String value) {
+  void sendText(String value) {
     assert(value.length == 1);
     _send(Uint8List.fromList(utf8.encode(value)));
   }

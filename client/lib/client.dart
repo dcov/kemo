@@ -13,6 +13,9 @@ class Client extends StatefulWidget {
     @required this.port
   }) : assert(address != null),
        assert(port != null),
+       // Usually a [key] isn't initialized by the consumer, but in this case
+       // since we're using the [address] and [port] as the identity, it makes
+       // sense to 
        super(key: ValueKey('$address:$port'));
 
   final String address;
@@ -90,7 +93,7 @@ class _ClientState extends State<Client> {
                 ],
             ]),
             if (_socket != null)
-              _KeyboardControl(),
+              _TextInputControl(onTextInput: _socket.sendText),
         ]));
   }
 }
@@ -144,20 +147,27 @@ class _MouseControl extends StatelessWidget {
   }
 }
 
-class _KeyboardControl extends StatefulWidget {
+class _TextInputControl extends StatefulWidget {
+
+  _TextInputControl({
+    Key key,
+    @required this.onTextInput,
+  }) : assert(onTextInput != null),
+       super(key: key);
+
+  final ValueChanged<String> onTextInput;
 
   @override
-  _KeyboardControlState createState() => _KeyboardControlState();
+  _TextInputControlState createState() => _TextInputControlState();
 }
 
-class _KeyboardControlState extends State<_KeyboardControl>
-    with SingleTickerProviderStateMixin
-    implements TextInputClient {
+class _TextInputControlState extends State<_TextInputControl>
+    with SingleTickerProviderStateMixin {
 
+  final GlobalKey<EditableTextState> _editableTextKey = GlobalKey<EditableTextState>();
   AnimationController _animationController;
+  TextEditingController _textEditingController;
   FocusNode _focusNode;
-  FocusAttachment _focusAttachment;
-  TextInputConnection _textInputConnection;
 
   @override
   void initState() {
@@ -166,84 +176,31 @@ class _KeyboardControlState extends State<_KeyboardControl>
       duration: Duration(milliseconds: 100),
       value: 0.0,
       vsync: this);
+    _textEditingController = TextEditingController();
     _focusNode = FocusNode();
-    _focusAttachment = _focusNode.attach(context);
-    _focusNode.addListener(_handleFocusChange);
   }
 
   @override
   void dispose() {
     super.dispose();
-    _focusNode.removeListener(_handleFocusChange);
-    _textInputConnection?.close();
-    _focusAttachment.detach();
     _focusNode.dispose();
+    _textEditingController.dispose();
     _animationController.dispose();
   }
 
-  void _showKeyboard() {
-    print('Showing keyboard');
-    if (!_focusNode.hasFocus) {
-      FocusScope.of(context).requestFocus(_focusNode);
-    } else {
-      _maybeOpenInputConnection();
-    }
-  }
-
-  void _handleFocusChange() {
-    print('Focus changed to ${_focusNode.hasFocus}');
-    if (_focusNode.hasFocus && _focusNode.consumeKeyboardToken()) {
-      _maybeOpenInputConnection();
-    } else {
-      if (_textInputConnection != null) {
-        _textInputConnection.close();
-        _textInputConnection = null;
-      }
-    }
-  }
-
-  void _maybeOpenInputConnection() {
-    if (_textInputConnection == null) {
-      print('Opening input connection');
-      _textInputConnection = TextInput.attach(this, TextInputConfiguration());
-    }
-    print('showing input connection');
-    _textInputConnection.show();
-  }
-
-  @override
-  TextEditingValue get currentTextEditingValue => null;
-
-  @override
-  void performAction(TextInputAction action) {
-  }
-
-  @override
-  void updateEditingValue(TextEditingValue value) {
-    print('Updating text editing value to: ${value.text}');
-  }
-
-  void updateFloatingCursor(RawFloatingCursorPoint _) {}
-
-  @override
-  void connectionClosed() {
-    print('Connection closed');
-    assert(_textInputConnection != null);
-    _textInputConnection.connectionClosedReceived();
-    _textInputConnection = null;
-  }
-
-  Future<bool> _maybeHandleBackPress() {
-    if (_focusNode.hasFocus) {
-      _focusNode.unfocus();
-    }
+  Future<bool> _handleBackPress() {
     return Future.value(true);
+  }
+
+  void _showKeyboard() {
+    final EditableTextState editableText = _editableTextKey.currentState;
+    editableText.requestKeyboard();
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: _maybeHandleBackPress,
+      onWillPop: _handleBackPress,
       child: Stack(
         children: <Widget>[
           Align(
@@ -261,7 +218,34 @@ class _KeyboardControlState extends State<_KeyboardControl>
                 decoration: BoxDecoration(
                   color: Colors.black.withAlpha((150 * value).round())));
             }),
+          Offstage(
+            offstage: true,
+            child: EditableText(
+              key: _editableTextKey,
+              focusNode: _focusNode,
+              controller: _textEditingController,
+              backgroundCursorColor: Colors.transparent,
+              cursorColor: Colors.transparent,
+              style: const TextStyle(),
+              inputFormatters: <TextInputFormatter>[
+                _RedirectingFormatter(widget.onTextInput)
+              ])),
         ]));
+  }
+}
+
+class _RedirectingFormatter implements TextInputFormatter {
+
+  _RedirectingFormatter(this.onTextInput);
+
+  final ValueChanged<String> onTextInput;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue _, TextEditingValue newValue) {
+    if (newValue.text.isNotEmpty) {
+      onTextInput(newValue.text);
+    }
+    return TextEditingValue.empty;
   }
 }
 

@@ -38,8 +38,6 @@ fn handle_client(mut stream: TcpStream) {
                 } else {
                     let second = buffer[1];
 
-                    // If the MSB of the second byte is 0, then it's a click
-                    // event, else it's a move event.
                     if second & 0x80 == 0 {
                     } else {
                         let dx = if first & 0x40 == 0 {
