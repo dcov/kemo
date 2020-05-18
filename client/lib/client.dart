@@ -92,8 +92,8 @@ class _ClientState extends State<Client> {
                         onRightClick: _socket.sendMouseRightClick))),
                 ],
             ]),
-            if (_socket != null)
-              _TextInputControl(onTextInput: _socket.sendText),
+          if (_socket != null)
+            _TextInputControl(onTextInput: _socket.sendText),
         ]));
   }
 }
@@ -189,48 +189,50 @@ class _TextInputControlState extends State<_TextInputControl>
   }
 
   Future<bool> _handleBackPress() {
+    _animationController.reverse();
     return Future.value(true);
   }
 
   void _showKeyboard() {
     final EditableTextState editableText = _editableTextKey.currentState;
     editableText.requestKeyboard();
+    _animationController.forward();
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: _handleBackPress,
-      child: Stack(
-        children: <Widget>[
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: GestureDetector(
-              onTap: _showKeyboard,
-              child: SizedBox(
-                height: 48.0,
-                child: Center(
-                  child: Icon(Icons.keyboard))))),
-          ValueListenableBuilder(
-            valueListenable: _animationController,
-            builder: (BuildContext context, double value, _) {
-              return DecoratedBox(
+      child: ValueListenableBuilder(
+        valueListenable: _animationController,
+        builder: (BuildContext context, double value, _){
+          return Stack(
+            children: <Widget>[
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: GestureDetector(
+                  onTap: _showKeyboard,
+                  child: SizedBox(
+                    height: 48.0,
+                    child: Center(
+                      child: Icon(Icons.keyboard))))),
+              DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.black.withAlpha((150 * value).round())));
-            }),
-          Offstage(
-            offstage: true,
-            child: EditableText(
-              key: _editableTextKey,
-              focusNode: _focusNode,
-              controller: _textEditingController,
-              backgroundCursorColor: Colors.transparent,
-              cursorColor: Colors.transparent,
-              style: const TextStyle(),
-              inputFormatters: <TextInputFormatter>[
-                _RedirectingFormatter(widget.onTextInput)
-              ])),
-        ]));
+                  color: Colors.black.withAlpha((150 * value).round()))),
+              Offstage(
+                offstage: true,
+                child: EditableText(
+                  key: _editableTextKey,
+                  focusNode: _focusNode,
+                  controller: _textEditingController,
+                  backgroundCursorColor: Colors.transparent,
+                  cursorColor: Colors.transparent,
+                  style: const TextStyle(),
+                  inputFormatters: <TextInputFormatter>[
+                    _RedirectingFormatter(widget.onTextInput)
+                  ])),
+            ]);
+        }));
   }
 }
 
