@@ -5,157 +5,65 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'messages.dart';
+import 'widgets.dart';
 
-class Client extends StatefulWidget {
+class _TouchInputControl extends StatelessWidget {
 
-  Client({
-    @required this.address,
-    @required this.port
-  }) : assert(address != null),
-       assert(port != null),
-       // Usually a [key] isn't initialized by the consumer, but in this case
-       // since we're using the [address] and [port] as the identity, it makes
-       // sense to 
-       super(key: ValueKey('$address:$port'));
-
-  final String address;
-  final int port;
-
-  @override
-  _ClientState createState() => _ClientState();
-}
-
-class _ClientState extends State<Client> {
-
-  Future<Socket> _socketFuture;
-  Socket _socket;
-
-  void  _connectToHost() {
-    _socketFuture = () async {
-      final Socket socket = await Socket.connect(widget.address, widget.port);
-      _socket = socket;
-      if (mounted) {
-        setState(() { });
-      }
-      return socket;
-    }();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _connectToHost();
-  }
-
-  @override
-  void didUpdateWidget(Client oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    assert(widget.address == oldWidget.address &&
-           widget.port == oldWidget.port);
-  }
-
-  @override
-  void dispose() {
-    if (_socket == null) {
-      _socketFuture.then((socket) => socket.close());
-    } else {
-      _socket.close();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      child: Stack(
-        children: <Widget>[
-          Column(
-            children: <Widget>[
-              Padding(
-                padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-                child: SizedBox(
-                  height: 48.0,
-                  child: NavigationToolbar(
-                    middle: Text(widget.address)))),
-              if (_socket == null)
-                Expanded(
-                  child: Center(
-                    child: CircularProgressIndicator()))
-              else
-                ...[
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: 48.0),
-                      child: _MouseControl(
-                        onMove: (details) => _socket.sendMouseMove(details.delta),
-                        onLeftClick: _socket.sendMouseLeftClick,
-                        onRightClick: _socket.sendMouseRightClick))),
-                ],
-            ]),
-          if (_socket != null)
-            _TextInputControl(onTextInput: _socket.sendText),
-        ]));
-  }
-}
-
-class _MouseControl extends StatelessWidget {
-
-  _MouseControl({
+  _TouchInputControl({
     Key key,
     @required this.onMove,
     @required this.onLeftClick,
-    @required this.onRightClick
+    @required this.onRightClick,
   }) : assert(onMove != null),
        assert(onLeftClick != null),
        assert(onRightClick != null),
        super(key: key);
 
-  final GestureDragUpdateCallback onMove;
+  final ValueChanged<Offset> onMove;
 
   final VoidCallback onLeftClick;
 
   final VoidCallback onRightClick;
 
-  Widget _buildMouseButton(VoidCallback onTap) {
-    return Flexible(
-      flex: 1,
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.grey),
-          child: SizedBox.expand())));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Expanded(
-          child: GestureDetector(
-            onPanUpdate: onMove)),
-        Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-          child: SizedBox(
-            height: 48.0,
-            child: Row(
-              children: <Widget>[
-                _buildMouseButton(onLeftClick),
-                _buildMouseButton(onRightClick)
-              ])))
-      ]);
+    return GestureDetector(
+      onPanUpdate: (_) {
+        print('onPanUpdate: ${_.delta}');
+        onMove(_.delta);
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white70),
+        child: SizedBox.expand()));
   }
 }
+
+class _RedirectingFormatter implements TextInputFormatter {
+
+  _RedirectingFormatter(this.onText);
+
+  final ValueChanged<String> onText;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue _, TextEditingValue newValue) {
+    if (newValue.text.isNotEmpty) {
+      onText(newValue.text);
+    }
+    return TextEditingValue.empty;
+  }
+}
+
 
 class _TextInputControl extends StatefulWidget {
 
   _TextInputControl({
     Key key,
-    @required this.onTextInput,
-  }) : assert(onTextInput != null),
+    @required this.onText,
+  }) : assert(onText != null),
        super(key: key);
 
-  final ValueChanged<String> onTextInput;
+  final ValueChanged<String> onText;
 
   @override
   _TextInputControlState createState() => _TextInputControlState();
@@ -229,25 +137,115 @@ class _TextInputControlState extends State<_TextInputControl>
                   cursorColor: Colors.transparent,
                   style: const TextStyle(),
                   inputFormatters: <TextInputFormatter>[
-                    _RedirectingFormatter(widget.onTextInput)
+                    _RedirectingFormatter(widget.onText)
                   ])),
             ]);
         }));
   }
 }
 
-class _RedirectingFormatter implements TextInputFormatter {
+class Client extends StatefulWidget {
 
-  _RedirectingFormatter(this.onTextInput);
+  Client({
+    @required this.address,
+    @required this.port
+  }) : assert(address != null),
+       assert(port != null),
+       // Usually a [Key] isn't initialized by the consumer, but in this case
+       // we're using the [address] and [port] as the 'identity' of the [Widget]
+       // instead of the [key].
+       super(key: ValueKey('$address:$port'));
 
-  final ValueChanged<String> onTextInput;
+  final String address;
+  final int port;
 
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue _, TextEditingValue newValue) {
-    if (newValue.text.isNotEmpty) {
-      onTextInput(newValue.text);
+  _ClientState createState() => _ClientState();
+}
+
+class _ClientState extends State<Client>
+    with SingleTickerProviderStateMixin {
+
+  Future<Socket> _socketFuture;
+  Socket _socket;
+  AnimationController _switcherController;
+  FocusNode _textInputFocus;
+
+  static const Duration _kSwitcherDuration = Duration(milliseconds: 250);
+
+  @override
+  void initState() {
+    super.initState();
+    // We initialize the [_socket] in an anonymous async function, and store the
+    // [Future] in case we are disposed before it completes so that we can then 
+    // listen to the [Future] to dispose it once it completes.
+    _socketFuture = () async {
+      final Socket socket = await Socket.connect(widget.address, widget.port);
+      _socket = socket;
+      if (mounted) {
+        setState(() { });
+      }
+      return socket;
+    }();
+
+    _switcherController = AnimationController(
+      duration: _kSwitcherDuration,
+      value: 0.0,
+      vsync: this);
+
+    _textInputFocus = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(Client oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    assert(widget.address == oldWidget.address &&
+           widget.port == oldWidget.port);
+  }
+
+  @override
+  void dispose() {
+    if (_socket == null) {
+      _socketFuture.then((Socket socket) => socket.close());
+    } else {
+      _socket.close();
     }
-    return TextEditingValue.empty;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top),
+            child: SizedBox(
+              height: 48.0,
+              child: NavigationToolbar(
+                middle: Text(widget.address),
+                trailing: IconButtonSwitcher(
+                  animation: _switcherController,
+                  firstIcon: Icons.keyboard,
+                  secondIcon: Icons.mouse,
+                  onFirstPressed: _switcherController.forward,
+                  onSecondPressed: _switcherController.reverse)))),
+          if (_socket == null)
+            Expanded(
+              child: Center(
+                child: CircularProgressIndicator()))
+          else
+            Expanded(
+              child: VerticalSwitcher(
+                animation: _switcherController,
+                top: _TouchInputControl(
+                  onMove: _socket.sendMove,
+                  onLeftClick: _socket.sendLeftClick,
+                  onRightClick: _socket.sendRightClick),
+                bottom: _TextInputControl(
+                  onText: _socket.sendText)))
+        ]));
   }
 }
 
