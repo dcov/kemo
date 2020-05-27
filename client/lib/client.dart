@@ -55,12 +55,12 @@ class _TouchInputControl extends StatelessWidget {
     return Row(
       children: <Widget>[
         Flexible(
-          flex: 4,
+          flex: 19,
           fit: FlexFit.tight,
-          child: CustomPaint(
-            painter: _TouchPadPainter(lineColor: Colors.grey),
-            child: GestureDetector(
-              onPanUpdate: (DragUpdateDetails details) => onMove(details.delta),
+          child: GestureDetector(
+            onPanUpdate: (DragUpdateDetails details) => onMove(details.delta),
+            child: CustomPaint(
+              painter: _TouchPadPainter(lineColor: Colors.grey),
               child: Row(
                 children: <Widget>[
                   Flexible(
