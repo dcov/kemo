@@ -12,8 +12,7 @@ class _VerticalSwitcherLayout extends MultiChildLayoutDelegate {
   final Animation<double> animation;
 
   void _placeChild(_VerticalSwitcherLayoutSlot slot, Size size, double offsetY) {
-    final Size childSize = layoutChild(slot, BoxConstraints.tight(size));
-    print('$slot: $childSize');
+    layoutChild(slot, BoxConstraints.tight(size));
     positionChild(slot, Offset(0, offsetY));
   }
 

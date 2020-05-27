@@ -7,19 +7,44 @@ import 'package:flutter/services.dart';
 import 'messages.dart';
 import 'widgets.dart';
 
+class _TouchPadPainter extends CustomPainter {
+
+  const _TouchPadPainter({ this.lineColor });
+
+  final Color lineColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double offsetX = size.width / 2;
+    canvas.drawLine(
+      Offset(offsetX, size.height),
+      Offset(offsetX, size.height - (size.height / 5)),
+      Paint()..color = lineColor);
+  }
+
+  @override
+  bool shouldRepaint(_TouchPadPainter oldPainter) {
+    return this.lineColor != oldPainter.lineColor;
+  }
+}
+
 class _TouchInputControl extends StatelessWidget {
 
   _TouchInputControl({
     Key key,
     @required this.onMove,
+    @required this.onScroll,
     @required this.onLeftClick,
     @required this.onRightClick,
   }) : assert(onMove != null),
+       assert(onScroll != null),
        assert(onLeftClick != null),
        assert(onRightClick != null),
        super(key: key);
 
   final ValueChanged<Offset> onMove;
+  
+  final ValueChanged<Offset> onScroll;
 
   final VoidCallback onLeftClick;
 
@@ -27,15 +52,38 @@ class _TouchInputControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanUpdate: (_) {
-        print('onPanUpdate: ${_.delta}');
-        onMove(_.delta);
-      },
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white70),
-        child: SizedBox.expand()));
+    return Row(
+      children: <Widget>[
+        Flexible(
+          flex: 4,
+          fit: FlexFit.tight,
+          child: CustomPaint(
+            painter: _TouchPadPainter(lineColor: Colors.grey),
+            child: GestureDetector(
+              onPanUpdate: (DragUpdateDetails details) => onMove(details.delta),
+              child: Row(
+                children: <Widget>[
+                  Flexible(
+                    flex: 1,
+                    fit: FlexFit.tight,
+                    child:  GestureDetector(
+                      onTap: onLeftClick)),
+                  Flexible(
+                    flex: 1,
+                    fit: FlexFit.tight,
+                    child: GestureDetector(
+                      onTap: onRightClick))
+                ])))),
+        Flexible(
+          flex: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.grey),
+            child: GestureDetector(
+              onVerticalDragUpdate: (DragUpdateDetails details) {
+                onScroll(details.delta);
+              }))),
+      ]);
   }
 }
 
@@ -225,12 +273,16 @@ class _ClientState extends State<Client>
               height: 48.0,
               child: NavigationToolbar(
                 middle: Text(widget.address),
-                trailing: IconButtonSwitcher(
-                  animation: _switcherController,
-                  firstIcon: Icons.keyboard,
-                  secondIcon: Icons.mouse,
-                  onFirstPressed: _switcherController.forward,
-                  onSecondPressed: _switcherController.reverse)))),
+                trailing: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 12.0),
+                  child: IconButtonSwitcher(
+                    animation: _switcherController,
+                    firstIcon: Icons.keyboard,
+                    secondIcon: Icons.mouse,
+                    onFirstPressed: _switcherController.forward,
+                    onSecondPressed: _switcherController.reverse))))),
           if (_socket == null)
             Expanded(
               child: Center(
@@ -241,6 +293,7 @@ class _ClientState extends State<Client>
                 animation: _switcherController,
                 top: _TouchInputControl(
                   onMove: _socket.sendMove,
+                  onScroll: _socket.sendScroll,
                   onLeftClick: _socket.sendLeftClick,
                   onRightClick: _socket.sendRightClick),
                 bottom: _TextInputControl(

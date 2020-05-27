@@ -44,6 +44,9 @@ extension SocketMessenger on Socket {
     _send(data);
   }
 
+  void sendScroll(Offset offset) {
+  }
+
   void sendLeftClick() {
     final Uint8List data = Uint8List(1);
     // Left click is packed into a single byte where only the MSB is set to one.
