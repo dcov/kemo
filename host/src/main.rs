@@ -3,6 +3,18 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use enigo::*;
 
+fn key_click(enigo: &mut Enigo, buffer: &[u8], size: usize) {
+    match String::from_utf8(Vec::from(&buffer[0..size])) {
+        Ok(s) => {
+            let c = s.chars().next().unwrap();
+            enigo.key_click(Key::Layout(c));
+        },
+        Err(e) => {
+            println!("Error decoding character key: {}", e);
+        }
+    }
+}
+
 fn handle_client(mut stream: TcpStream) {
     let mut enigo = Enigo::new();
 
@@ -15,46 +27,51 @@ fn handle_client(mut stream: TcpStream) {
 
                 let first = buffer[0];
 
-                // If the MSB of the first byte is 0 then it's a UTF-8 encoded
-                // character, else it's a mouse event.
-                if first & 0x80 == 0 {
-                    let s = match String::from_utf8(Vec::from(&buffer[0..size])) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            println!("Error decoding character key: {}", e);
-                            continue
-                        }
+                if size == 1 {
+                    if first & 0x80 == 0 {
+                        key_click(&mut enigo, &buffer, size);
+                        continue;
+                    } 
+
+                    if first & 0x40 == 0 {
+                        enigo.mouse_click(MouseButton::Left);
+                        continue;
+                    } 
+
+                    if first - 0xC0 == 0 {
+                        enigo.mouse_click(MouseButton::Right);
+                        continue;
+                    } 
+
+                    let scroll_y = if first & 0x20 == 0 {
+                        (first - 0xC0) as i32
+                    } else {
+                        -((first - 0xE0) as i32)
                     };
 
-                    let c = s.chars().next().unwrap();
-                    enigo.key_click(Key::Layout(c));
+                    enigo.mouse_scroll_y(scroll_y);
+                    continue;
+                } 
 
-                } else if size == 1 {
-                    if first & 0x1 == 0 {
-                        enigo.mouse_click(MouseButton::Left);
-                    } else {
-                        enigo.mouse_click(MouseButton::Right);
-                    }
-                } else {
-                    let second = buffer[1];
-
-                    if second & 0x80 == 0 {
-                    } else {
-                        let dx = if first & 0x40 == 0 {
-                            (first - 128) as i32
-                        } else {
-                            -((first - 192) as i32)
-                        };
-
-                        let dy = if second & 0x40 == 0 {
-                            (second - 128) as i32
-                        } else {
-                            -((second - 192) as i32)
-                        };
-
-                        enigo.mouse_move_relative(dx, dy);
-                    }
+                if first & 0x80 == 1 {
+                    key_click(&mut enigo, &buffer, size);
                 }
+                
+                let second = buffer[1];
+
+                let dx = if first & 0x40 == 0 {
+                    first as i32
+                } else {
+                    -((first - 0x40) as i32)
+                };
+
+                let dy = if second & 0x40 == 0 {
+                    second as i32
+                } else {
+                    -((second - 0x40) as i32)
+                };
+
+                enigo.mouse_move_relative(dx, dy);
             },
             Err(_) => {
                 break
