@@ -78,7 +78,7 @@ class _TouchInputControl extends StatelessWidget {
           flex: 1,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.grey),
+              color: Colors.black.withOpacity(.1)),
             child: GestureDetector(
               onVerticalDragUpdate: (DragUpdateDetails details) {
                 onScroll(details.delta);
@@ -140,9 +140,13 @@ class _TextInputControlState extends State<_TextInputControl>
     _textEditingController.dispose();
   }
 
-  void requestKeyboard() {
+  void showKeyboard() {
     final EditableTextState editableText = _editableTextKey.currentState;
     editableText.requestKeyboard();
+  }
+
+  void hideKeyboard() {
+    _focusNode.unfocus();
   }
 
   @override
@@ -175,7 +179,7 @@ class _TextInputControlState extends State<_TextInputControl>
                 child: Text('Backspace'))
             ])),
         GestureDetector(
-          onTap: requestKeyboard,
+          onTap: showKeyboard,
           child: SizedBox(
             height: 48.0,
             child: Center(
@@ -214,9 +218,11 @@ class _ClientState extends State<Client>
   static const Duration _kSwitcherDuration = Duration(milliseconds: 250);
 
   void _handleAnimationStatusChange(AnimationStatus status) {
+    final _TextInputControlState textInputControl = _textInputControlKey.currentState;
     if (status == AnimationStatus.completed) {
-      final _TextInputControlState textInputControl = _textInputControlKey.currentState;
-      textInputControl.requestKeyboard();
+      textInputControl.showKeyboard();
+    } else if (status == AnimationStatus.reverse) {
+      textInputControl.hideKeyboard();
     }
   }
 
@@ -263,32 +269,17 @@ class _ClientState extends State<Client>
 
   @override
   Widget build(BuildContext context) {
+    final EdgeInsets mediaPadding = MediaQuery.of(context).padding;
     return Material(
-      child: Column(
+      child: Stack(
         children: <Widget>[
-          Padding(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top),
-            child: SizedBox(
-              height: 48.0,
-              child: NavigationToolbar(
-                middle: Text(widget.address),
-                trailing: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 12.0),
-                  child: IconButtonSwitcher(
-                    animation: _switcherController,
-                    firstIcon: Icons.keyboard,
-                    secondIcon: Icons.mouse,
-                    onFirstPressed: _switcherController.forward,
-                    onSecondPressed: _switcherController.reverse))))),
           if (_socket == null)
-            Expanded(
-              child: Center(
-                child: CircularProgressIndicator()))
+            Center(
+              child: CircularProgressIndicator())
           else
-            Expanded(
+            Padding(
+              padding: EdgeInsets.only(
+                top: mediaPadding.top + 48.0),
               child: VerticalSwitcher(
                 animation: _switcherController,
                 top: _TouchInputControl(
@@ -299,7 +290,25 @@ class _ClientState extends State<Client>
                 bottom: _TextInputControl(
                   key: _textInputControlKey,
                   onText: _socket.sendText,
-                  onBackspace: _socket.sendBackspace)))
+                  onBackspace: _socket.sendBackspace))),
+          Material(
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: mediaPadding.top),
+              child: SizedBox(
+                height: 48.0,
+                child: NavigationToolbar(
+                  middle: Text(widget.address),
+                  trailing: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 12.0),
+                    child: IconButtonSwitcher(
+                      animation: _switcherController,
+                      firstIcon: Icons.keyboard,
+                      secondIcon: Icons.mouse,
+                      onFirstPressed: _switcherController.forward,
+                      onSecondPressed: _switcherController.reverse)))))),
         ]));
   }
 }
