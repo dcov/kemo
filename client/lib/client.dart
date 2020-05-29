@@ -55,7 +55,7 @@ class _TouchInputControl extends StatelessWidget {
     return Row(
       children: <Widget>[
         Flexible(
-          flex: 19,
+          flex: 9,
           fit: FlexFit.tight,
           child: GestureDetector(
             onPanUpdate: (DragUpdateDetails details) => onMove(details.delta),
@@ -102,16 +102,18 @@ class _RedirectingFormatter implements TextInputFormatter {
   }
 }
 
-
 class _TextInputControl extends StatefulWidget {
 
   _TextInputControl({
     Key key,
     @required this.onText,
+    @required this.onBackspace,
   }) : assert(onText != null),
        super(key: key);
 
   final ValueChanged<String> onText;
+
+  final VoidCallback onBackspace;
 
   @override
   _TextInputControlState createState() => _TextInputControlState();
@@ -121,17 +123,12 @@ class _TextInputControlState extends State<_TextInputControl>
     with SingleTickerProviderStateMixin {
 
   final GlobalKey<EditableTextState> _editableTextKey = GlobalKey<EditableTextState>();
-  AnimationController _animationController;
   TextEditingController _textEditingController;
   FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: Duration(milliseconds: 100),
-      value: 0.0,
-      vsync: this);
     _textEditingController = TextEditingController();
     _focusNode = FocusNode();
   }
@@ -141,54 +138,49 @@ class _TextInputControlState extends State<_TextInputControl>
     super.dispose();
     _focusNode.dispose();
     _textEditingController.dispose();
-    _animationController.dispose();
   }
 
-  Future<bool> _handleBackPress() {
-    _animationController.reverse();
-    return Future.value(true);
-  }
-
-  void _showKeyboard() {
+  void requestKeyboard() {
     final EditableTextState editableText = _editableTextKey.currentState;
     editableText.requestKeyboard();
-    _animationController.forward();
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _handleBackPress,
-      child: ValueListenableBuilder(
-        valueListenable: _animationController,
-        builder: (BuildContext context, double value, _){
-          return Stack(
+    final EdgeInsets viewInsets = MediaQuery.of(context).viewInsets;
+    final double bottomCustomKeysPadding = viewInsets.bottom > 0 ? viewInsets.bottom - 48 : 0;
+    return Column(
+      children: <Widget>[
+        Spacer(),
+        Offstage(
+          offstage: true,
+          child: EditableText(
+            key: _editableTextKey,
+            focusNode: _focusNode,
+            controller: _textEditingController,
+            backgroundCursorColor: Colors.transparent,
+            cursorColor: Colors.transparent,
+            style: const TextStyle(),
+            inputFormatters: <TextInputFormatter>[
+              _RedirectingFormatter(widget.onText)
+            ])),
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: bottomCustomKeysPadding),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: GestureDetector(
-                  onTap: _showKeyboard,
-                  child: SizedBox(
-                    height: 48.0,
-                    child: Center(
-                      child: Icon(Icons.keyboard))))),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha((150 * value).round()))),
-              Offstage(
-                offstage: true,
-                child: EditableText(
-                  key: _editableTextKey,
-                  focusNode: _focusNode,
-                  controller: _textEditingController,
-                  backgroundCursorColor: Colors.transparent,
-                  cursorColor: Colors.transparent,
-                  style: const TextStyle(),
-                  inputFormatters: <TextInputFormatter>[
-                    _RedirectingFormatter(widget.onText)
-                  ])),
-            ]);
-        }));
+              FlatButton(
+                onPressed: widget.onBackspace,
+                child: Text('Backspace'))
+            ])),
+        GestureDetector(
+          onTap: requestKeyboard,
+          child: SizedBox(
+            height: 48.0,
+            child: Center(
+              child: Icon(Icons.keyboard))))
+      ]);
   }
 }
 
@@ -214,12 +206,19 @@ class Client extends StatefulWidget {
 class _ClientState extends State<Client>
     with SingleTickerProviderStateMixin {
 
+  final GlobalKey<_TextInputControlState> _textInputControlKey = GlobalKey<_TextInputControlState>();
   Future<Socket> _socketFuture;
   Socket _socket;
   AnimationController _switcherController;
-  FocusNode _textInputFocus;
 
   static const Duration _kSwitcherDuration = Duration(milliseconds: 250);
+
+  void _handleAnimationStatusChange(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      final _TextInputControlState textInputControl = _textInputControlKey.currentState;
+      textInputControl.requestKeyboard();
+    }
+  }
 
   @override
   void initState() {
@@ -240,8 +239,7 @@ class _ClientState extends State<Client>
       duration: _kSwitcherDuration,
       value: 0.0,
       vsync: this);
-
-    _textInputFocus = FocusNode();
+    _switcherController.addStatusListener(_handleAnimationStatusChange);
   }
 
   @override
@@ -253,6 +251,8 @@ class _ClientState extends State<Client>
 
   @override
   void dispose() {
+    _switcherController.removeStatusListener(_handleAnimationStatusChange);
+    _switcherController.dispose();
     if (_socket == null) {
       _socketFuture.then((Socket socket) => socket.close());
     } else {
@@ -297,7 +297,9 @@ class _ClientState extends State<Client>
                   onLeftClick: _socket.sendLeftClick,
                   onRightClick: _socket.sendRightClick),
                 bottom: _TextInputControl(
-                  onText: _socket.sendText)))
+                  key: _textInputControlKey,
+                  onText: _socket.sendText,
+                  onBackspace: _socket.sendBackspace)))
         ]));
   }
 }
